@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Perceptron vs SVM — Margin, Intuition & Robustness</title>
+  <meta name="description" content="An interactive, visual explanation of why SVM margins generalize better than a plain perceptron." />
+  <style>
+    :root {
+      --bg: #07111f;
+      --bg2: #0b1728;
+      --card: rgba(14, 24, 42, 0.82);
+      --card2: rgba(18, 31, 54, 0.9);
+      --line: rgba(255,255,255,0.10);
+      --text: #e8eef9;
+      --muted: #a7b4cc;
+      --accent: #78a6ff;
+      --accent2: #7ce7c3;
+      --danger: #ff7d7d;
+      --warning: #ffd166;
+      --shadow: 0 18px 60px rgba(0,0,0,0.35);
+      --radius: 24px;
+      --radius-sm: 18px;
+      --max: 1180px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(120,166,255,0.18), transparent 30%),
+        radial-gradient(circle at 85% 15%, rgba(124,231,195,0.12), transparent 26%),
+        linear-gradient(180deg, var(--bg), var(--bg2) 64%, #050b14 100%);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    .wrap { width: min(var(--max), calc(100% - 32px)); margin: 0 auto; }
+
+    header {
+      position: sticky; top: 0; z-index: 20;
+      backdrop-filter: blur(16px);
+      background: linear-gradient(180deg, rgba(7,17,31,0.92), rgba(7,17,31,0.60));
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .nav {
+      display: flex; align-items: center; justify-content: space-between; gap: 18px;
+      padding: 16px 0;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 42px; height: 42px; border-radius: 14px;
+      background: linear-gradient(135deg, rgba(120,166,255,0.95), rgba(124,231,195,0.9));
+      box-shadow: 0 10px 30px rgba(120,166,255,0.25);
+      display: grid; place-items: center; font-weight: 900; color: #081121;
+    }
+    .brand h1 { margin: 0; font-size: 1rem; line-height: 1.1; }
+    .brand span { display: block; color: var(--muted); font-size: .82rem; margin-top: 3px; }
+    .navlinks { display: flex; flex-wrap: wrap; gap: 14px; font-size: .94rem; color: var(--muted); }
+    .navlinks a:hover { color: var(--text); }
+
+    .hero {
+      padding: 62px 0 28px;
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 28px;
+      align-items: center;
+    }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 14px; border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04); border-radius: 999px;
+      color: var(--muted); font-size: .86rem; letter-spacing: .02em;
+    }
+    .hero h2 {
+      font-size: clamp(2.4rem, 6vw, 4.8rem);
+      margin: 18px 0 16px;
+      line-height: 0.98;
+      letter-spacing: -0.04em;
+    }
+    .hero p {
+      margin: 0;
+      max-width: 62ch;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.8;
+    }
+    .cta {
+      display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px;
+    }
+    .btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 12px 18px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04); color: var(--text);
+      box-shadow: var(--shadow);
+      transition: transform .18s ease, background .18s ease, border-color .18s ease;
+    }
+    .btn:hover { transform: translateY(-2px); background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.18); }
+    .btn.primary { background: linear-gradient(135deg, rgba(120,166,255,0.95), rgba(124,231,195,0.85)); color: #07111f; font-weight: 700; }
+
+    .hero-card {
+      background: linear-gradient(180deg, rgba(12,23,41,0.95), rgba(11,18,31,0.92));
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+    .metric-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
+    }
+    .metric {
+      padding: 16px; border-radius: 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .metric b { display: block; font-size: 1.6rem; margin-bottom: 4px; }
+    .metric small { color: var(--muted); line-height: 1.5; }
+
+    .panel {
+      margin: 22px 0 0;
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(18,31,54,0.92), rgba(12,21,37,0.92));
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .panel-head {
+      padding: 18px 22px;
+      display: flex; justify-content: space-between; gap: 12px; align-items: center;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-wrap: wrap;
+    }
+    .panel-head h3 { margin: 0; font-size: 1.1rem; }
+    .panel-head p { margin: 0; color: var(--muted); font-size: .95rem; }
+    .panel-body { padding: 18px 22px 22px; }
+
+    .compare {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 22px;
+      padding: 18px;
+    }
+    .card h4 { margin: 0 0 8px; font-size: 1.08rem; }
+    .card p { margin: 0 0 14px; color: var(--muted); line-height: 1.7; font-size: .96rem; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .pill {
+      font-size: .78rem; padding: 6px 10px; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12); color: var(--muted);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .viz-box {
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    svg { display: block; width: 100%; height: auto; }
+
+    .steps {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+    }
+    .step {
+      padding: 18px; border-radius: 22px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .step .num {
+      width: 34px; height: 34px; border-radius: 50%;
+      display: grid; place-items: center; font-weight: 800; margin-bottom: 10px;
+      background: rgba(120,166,255,0.16); color: #c9d8ff;
+      border: 1px solid rgba(120,166,255,0.25);
+    }
+    .step h5 { margin: 0 0 8px; font-size: 1rem; }
+    .step p { margin: 0; color: var(--muted); line-height: 1.7; font-size: .93rem; }
+
+    .chart-wrap { height: 360px; }
+    .chart-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .toggle {
+      cursor: default;
+      padding: 8px 12px; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--muted);
+      background: rgba(255,255,255,0.03);
+      font-size: .88rem;
+    }
+    .toggle.active { color: #07111f; background: linear-gradient(135deg, rgba(120,166,255,0.95), rgba(124,231,195,0.9)); border-color: transparent; font-weight: 700; }
+
+    .footer {
+      padding: 28px 0 42px; color: var(--muted); font-size: .92rem;
+      display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    }
+
+    @media (max-width: 980px) {
+      .hero, .compare, .steps { grid-template-columns: 1fr; }
+      .nav { align-items: flex-start; flex-direction: column; }
+      .navlinks { gap: 10px 14px; }
+    }
+
+    @media (max-width: 640px) {
+      .wrap { width: min(var(--max), calc(100% - 22px)); }
+      .hero { padding-top: 36px; }
+      .panel-body, .panel-head { padding-left: 16px; padding-right: 16px; }
+      .hero-card { padding: 16px; }
+      .metric-grid { grid-template-columns: 1fr; }
+      .chart-wrap { height: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <div class="brand">
+        <div class="logo">S</div>
+        <div>
+          <h1>Perceptron vs SVM</h1>
+          <span>Interactive GitHub Pages explainer</span>
+        </div>
+      </div>
+      <nav class="navlinks">
+        <a href="#compare">Compare</a>
+        <a href="#intuition">Intuition</a>
+        <a href="#robustness">Robustness</a>
+        <a href="#takeaways">Takeaways</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">From notebook to polished web experience</div>
+        <h2>Why SVM generalizes better than a Perceptron.</h2>
+        <p>
+          This page turns the notebook’s core idea into a visual story: both models can separate data,
+          but SVM keeps a safe margin from the boundary, which makes it more stable when the data changes
+          or when outliers and noise appear.
+        </p>
+        <div class="cta">
+          <a class="btn primary" href="#compare">Explore the comparison</a>
+          <a class="btn" href="#robustness">See the noise chart</a>
+        </div>
+      </div>
+
+      <div class="hero-card">
+        <div class="metric-grid">
+          <div class="metric">
+            <b>Perceptron</b>
+            <small>Stops as soon as data is classified correctly. No explicit margin.</small>
+          </div>
+          <div class="metric">
+            <b>SVM</b>
+            <small>Maximizes the margin, giving a more robust decision boundary.</small>
+          </div>
+          <div class="metric">
+            <b>Outlier effect</b>
+            <small>A single point can pull the perceptron boundary closer.</small>
+          </div>
+          <div class="metric">
+            <b>Generalization</b>
+            <small>Margin-based separation tends to handle new data better.</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="compare" class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>Decision boundary comparison</h3>
+          <p>Same training data, two behaviors: exact separation versus margin-aware separation.</p>
+        </div>
+        <div class="pill-row" style="margin:0;">
+          <span class="pill">Synthetic 2D data</span>
+          <span class="pill">One outlier</span>
+          <span class="pill">Linear models</span>
+        </div>
+      </div>
+      <div class="panel-body compare">
+        <div class="card">
+          <h4>Perceptron</h4>
+          <div class="pill-row">
+            <span class="pill">Boundary follows training points</span>
+            <span class="pill">No margin objective</span>
+          </div>
+          <p>
+            The perceptron is satisfied when the data is separable. That makes it fast and elegant,
+            but it can become sensitive to borderline points and outliers.
+          </p>
+          <div class="viz-box">
+            <svg viewBox="0 0 560 360" role="img" aria-label="Perceptron boundary illustration">
+              <defs>
+                <linearGradient id="g1" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#78a6ff" stop-opacity="0.35" />
+                  <stop offset="100%" stop-color="#ff7d7d" stop-opacity="0.18" />
+                </linearGradient>
+              </defs>
+              <rect width="560" height="360" fill="rgba(255,255,255,0.02)"/>
+              <path d="M0 280 C110 240, 180 220, 260 185 S400 95, 560 55 L560 360 L0 360 Z" fill="url(#g1)"/>
+              <line x1="50" y1="300" x2="510" y2="80" stroke="#ffb1b1" stroke-width="4" stroke-dasharray="10 10" opacity="0.85"/>
+              <g fill="#78a6ff" opacity="0.95">
+                <circle cx="100" cy="95" r="9"/>
+                <circle cx="155" cy="135" r="9"/>
+                <circle cx="190" cy="88" r="9"/>
+                <circle cx="245" cy="140" r="9"/>
+                <circle cx="300" cy="108" r="9"/>
+                <circle cx="355" cy="120" r="9"/>
+                <circle cx="415" cy="86" r="9"/>
+              </g>
+              <g fill="#ff7d7d" opacity="0.95">
+                <rect x="95" y="250" width="18" height="18" rx="4"/>
+                <rect x="150" y="220" width="18" height="18" rx="4"/>
+                <rect x="220" y="250" width="18" height="18" rx="4"/>
+                <rect x="285" y="205" width="18" height="18" rx="4"/>
+                <rect x="350" y="235" width="18" height="18" rx="4"/>
+                <rect x="430" y="225" width="18" height="18" rx="4"/>
+              </g>
+              <circle cx="425" cy="214" r="10" fill="#ffd166" stroke="#2b1f00" stroke-width="2"/>
+              <text x="28" y="36" fill="#e8eef9" font-size="18" font-weight="700">Perceptron boundary</text>
+              <text x="28" y="58" fill="#a7b4cc" font-size="13">A boundary that is correct, but not margin-aware</text>
+            </svg>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>SVM</h4>
+          <div class="pill-row">
+            <span class="pill">Maximizes margin</span>
+            <span class="pill">Supports better stability</span>
+          </div>
+          <p>
+            SVM searches for a separator with the widest possible cushion between classes. That cushion
+            is what makes the model more resilient to small perturbations in the data.
+          </p>
+          <div class="viz-box">
+            <svg viewBox="0 0 560 360" role="img" aria-label="SVM margin illustration">
+              <defs>
+                <linearGradient id="g2" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#7ce7c3" stop-opacity="0.24" />
+                  <stop offset="100%" stop-color="#78a6ff" stop-opacity="0.18" />
+                </linearGradient>
+              </defs>
+              <rect width="560" height="360" fill="rgba(255,255,255,0.02)"/>
+              <path d="M0 288 C110 250, 180 232, 260 188 S400 95, 560 52 L560 360 L0 360 Z" fill="url(#g2)"/>
+              <line x1="55" y1="300" x2="505" y2="85" stroke="#e8eef9" stroke-width="3" opacity="0.9"/>
+              <line x1="40" y1="323" x2="485" y2="109" stroke="#78a6ff" stroke-width="3" stroke-dasharray="9 9" opacity="0.9"/>
+              <line x1="72" y1="278" x2="526" y2="65" stroke="#78a6ff" stroke-width="3" stroke-dasharray="9 9" opacity="0.9"/>
+              <g fill="#78a6ff" opacity="0.96">
+                <circle cx="105" cy="95" r="9"/>
+                <circle cx="160" cy="130" r="9"/>
+                <circle cx="195" cy="88" r="9"/>
+                <circle cx="250" cy="142" r="9"/>
+                <circle cx="305" cy="106" r="9"/>
+                <circle cx="360" cy="118" r="9"/>
+                <circle cx="418" cy="86" r="9"/>
+              </g>
+              <g fill="#ff7d7d" opacity="0.96">
+                <rect x="95" y="250" width="18" height="18" rx="4"/>
+                <rect x="150" y="220" width="18" height="18" rx="4"/>
+                <rect x="220" y="250" width="18" height="18" rx="4"/>
+                <rect x="285" y="205" width="18" height="18" rx="4"/>
+                <rect x="350" y="235" width="18" height="18" rx="4"/>
+                <rect x="430" y="225" width="18" height="18" rx="4"/>
+              </g>
+              <circle cx="425" cy="214" r="10" fill="#ffd166" stroke="#2b1f00" stroke-width="2"/>
+              <text x="28" y="36" fill="#e8eef9" font-size="18" font-weight="700">SVM boundary + margin</text>
+              <text x="28" y="58" fill="#a7b4cc" font-size="13">The model explicitly tries to keep the classes apart</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="intuition" class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>Intuitive narrative</h3>
+          <p>Convert the notebook’s logic into an easy mental model.</p>
+        </div>
+      </div>
+      <div class="panel-body steps">
+        <div class="step">
+          <div class="num">1</div>
+          <h5>Start with separability</h5>
+          <p>Both methods try to find a line that separates classes in the training set.</p>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <h5>Ask what happens near the line</h5>
+          <p>The perceptron only cares about being correct; SVM also cares about distance from the boundary.</p>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <h5>Introduce the outlier</h5>
+          <p>A single tricky point can pull a no-margin boundary toward unstable territory.</p>
+        </div>
+        <div class="step">
+          <div class="num">4</div>
+          <h5>Prefer the wider gap</h5>
+          <p>Margin acts like breathing room, which usually improves robustness on new samples.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="robustness" class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>Noise robustness</h3>
+          <p>In the notebook, the SVM curve stays steadier as noise increases.</p>
+        </div>
+        <div class="chart-controls" aria-label="Chart legend">
+          <span class="toggle active">Perceptron</span>
+          <span class="toggle active">SVM</span>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="viz-box chart-wrap">
+          <svg viewBox="0 0 1120 360" role="img" aria-label="Noise robustness chart">
+            <defs>
+              <linearGradient id="area1" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="#ff7d7d" stop-opacity="0.22" />
+                <stop offset="100%" stop-color="#ff7d7d" stop-opacity="0" />
+              </linearGradient>
+              <linearGradient id="area2" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="#78a6ff" stop-opacity="0.22" />
+                <stop offset="100%" stop-color="#78a6ff" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <rect width="1120" height="360" fill="rgba(255,255,255,0.02)"/>
+            <g stroke="rgba(255,255,255,0.10)" stroke-width="1">
+              <line x1="80" y1="40" x2="80" y2="300" />
+              <line x1="80" y1="300" x2="1050" y2="300" />
+              <line x1="80" y1="248" x2="1050" y2="248" />
+              <line x1="80" y1="196" x2="1050" y2="196" />
+              <line x1="80" y1="144" x2="1050" y2="144" />
+              <line x1="80" y1="92" x2="1050" y2="92" />
+              <line x1="80" y1="40" x2="1050" y2="40" />
+            </g>
+            <path d="M80 95 L188 118 L296 136 L404 152 L512 178 L620 198 L728 220 L836 244 L944 256 L1050 272 L1050 300 L80 300 Z" fill="url(#area1)"/>
+            <path d="M80 80 L188 90 L296 100 L404 106 L512 113 L620 121 L728 130 L836 138 L944 144 L1050 150 L1050 300 L80 300 Z" fill="url(#area2)"/>
+            <path d="M80 95 L188 118 L296 136 L404 152 L512 178 L620 198 L728 220 L836 244 L944 256 L1050 272" fill="none" stroke="#ff8f8f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M80 80 L188 90 L296 100 L404 106 L512 113 L620 121 L728 130 L836 138 L944 144 L1050 150" fill="none" stroke="#78a6ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            <g fill="#ff7d7d">
+              <circle cx="80" cy="95" r="6"/>
+              <circle cx="188" cy="118" r="6"/>
+              <circle cx="296" cy="136" r="6"/>
+              <circle cx="404" cy="152" r="6"/>
+              <circle cx="512" cy="178" r="6"/>
+              <circle cx="620" cy="198" r="6"/>
+              <circle cx="728" cy="220" r="6"/>
+              <circle cx="836" cy="244" r="6"/>
+              <circle cx="944" cy="256" r="6"/>
+              <circle cx="1050" cy="272" r="6"/>
+            </g>
+            <g fill="#78a6ff">
+              <circle cx="80" cy="80" r="6"/>
+              <circle cx="188" cy="90" r="6"/>
+              <circle cx="296" cy="100" r="6"/>
+              <circle cx="404" cy="106" r="6"/>
+              <circle cx="512" cy="113" r="6"/>
+              <circle cx="620" cy="121" r="6"/>
+              <circle cx="728" cy="130" r="6"/>
+              <circle cx="836" cy="138" r="6"/>
+              <circle cx="944" cy="144" r="6"/>
+              <circle cx="1050" cy="150" r="6"/>
+            </g>
+            <text x="32" y="40" fill="#e8eef9" font-size="18" font-weight="700">Accuracy vs. added noise</text>
+            <text x="32" y="60" fill="#a7b4cc" font-size="13">Illustrative view matching the notebook’s trend</text>
+            <text x="84" y="328" fill="#a7b4cc" font-size="12">0.0</text>
+            <text x="177" y="328" fill="#a7b4cc" font-size="12">0.2</text>
+            <text x="285" y="328" fill="#a7b4cc" font-size="12">0.4</text>
+            <text x="393" y="328" fill="#a7b4cc" font-size="12">0.6</text>
+            <text x="501" y="328" fill="#a7b4cc" font-size="12">0.8</text>
+            <text x="609" y="328" fill="#a7b4cc" font-size="12">1.0</text>
+            <text x="717" y="328" fill="#a7b4cc" font-size="12">1.2</text>
+            <text x="825" y="328" fill="#a7b4cc" font-size="12">1.4</text>
+            <text x="933" y="328" fill="#a7b4cc" font-size="12">1.6</text>
+            <text x="45" y="304" fill="#a7b4cc" font-size="12">0%</text>
+            <text x="40" y="252" fill="#a7b4cc" font-size="12">20%</text>
+            <text x="40" y="200" fill="#a7b4cc" font-size="12">40%</text>
+            <text x="40" y="148" fill="#a7b4cc" font-size="12">60%</text>
+            <text x="40" y="96" fill="#a7b4cc" font-size="12">80%</text>
+            <text x="34" y="44" fill="#a7b4cc" font-size="12">100%</text>
+            <g transform="translate(770,52)">
+              <rect x="0" y="0" width="280" height="72" rx="16" fill="rgba(7,17,31,0.55)" stroke="rgba(255,255,255,0.12)"/>
+              <circle cx="24" cy="24" r="6" fill="#ff7d7d"/>
+              <text x="40" y="28" fill="#e8eef9" font-size="13">Perceptron drops faster</text>
+              <circle cx="24" cy="48" r="6" fill="#78a6ff"/>
+              <text x="40" y="52" fill="#e8eef9" font-size="13">SVM stays more stable</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <section id="takeaways" class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>Takeaways</h3>
+          <p>The notebook’s conclusion, distilled for a public-facing project page.</p>
+        </div>
+      </div>
+      <div class="panel-body compare">
+        <div class="card">
+          <h4>What the page communicates</h4>
+          <p>
+            Perceptron is a correct-separation model; SVM is a correct-separation model with a built-in preference
+            for wider margins. That distinction matters when the data is imperfect, noisy, or slightly shifted.
+          </p>
+          <div class="pill-row">
+            <span class="pill">Margin = safety buffer</span>
+            <span class="pill">Outliers matter</span>
+            <span class="pill">Generalization improves</span>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Suggested GitHub Pages setup</h4>
+          <p>
+            Set Pages to deploy from the <strong>main</strong> branch and choose the <strong>/docs</strong> folder.
+            This landing page is already prepared for that workflow.
+          </p>
+          <div class="pill-row">
+            <span class="pill">main /docs</span>
+            <span class="pill">Static HTML</span>
+            <span class="pill">No build step</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      <span>Built from the notebook “Perceptron vs SVM – Margin and Overfitting”.</span>
+      <span>Designed for BenyaminMahdavifar/perceptron-vs-svm</span>
+    </div>
+  </main>
+</body>
+</html>
