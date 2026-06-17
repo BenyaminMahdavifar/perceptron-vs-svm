@@ -1,544 +1,617 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Perceptron vs SVM — Margin, Intuition & Robustness</title>
-  <meta name="description" content="An interactive, visual explanation of why SVM margins generalize better than a plain perceptron." />
-  <style>
-    :root {
-      --bg: #07111f;
-      --bg2: #0b1728;
-      --card: rgba(14, 24, 42, 0.82);
-      --card2: rgba(18, 31, 54, 0.9);
-      --line: rgba(255,255,255,0.10);
-      --text: #e8eef9;
-      --muted: #a7b4cc;
-      --accent: #78a6ff;
-      --accent2: #7ce7c3;
-      --danger: #ff7d7d;
-      --warning: #ffd166;
-      --shadow: 0 18px 60px rgba(0,0,0,0.35);
-      --radius: 24px;
-      --radius-sm: 18px;
-      --max: 1180px;
-    }
-
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(120,166,255,0.18), transparent 30%),
-        radial-gradient(circle at 85% 15%, rgba(124,231,195,0.12), transparent 26%),
-        linear-gradient(180deg, var(--bg), var(--bg2) 64%, #050b14 100%);
-      color: var(--text);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    a { color: inherit; text-decoration: none; }
-    .wrap { width: min(var(--max), calc(100% - 32px)); margin: 0 auto; }
-
-    header {
-      position: sticky; top: 0; z-index: 20;
-      backdrop-filter: blur(16px);
-      background: linear-gradient(180deg, rgba(7,17,31,0.92), rgba(7,17,31,0.60));
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-    }
-    .nav {
-      display: flex; align-items: center; justify-content: space-between; gap: 18px;
-      padding: 16px 0;
-    }
-    .brand { display: flex; align-items: center; gap: 12px; }
-    .logo {
-      width: 42px; height: 42px; border-radius: 14px;
-      background: linear-gradient(135deg, rgba(120,166,255,0.95), rgba(124,231,195,0.9));
-      box-shadow: 0 10px 30px rgba(120,166,255,0.25);
-      display: grid; place-items: center; font-weight: 900; color: #081121;
-    }
-    .brand h1 { margin: 0; font-size: 1rem; line-height: 1.1; }
-    .brand span { display: block; color: var(--muted); font-size: .82rem; margin-top: 3px; }
-    .navlinks { display: flex; flex-wrap: wrap; gap: 14px; font-size: .94rem; color: var(--muted); }
-    .navlinks a:hover { color: var(--text); }
-
-    .hero {
-      padding: 62px 0 28px;
-      display: grid;
-      grid-template-columns: 1.15fr .85fr;
-      gap: 28px;
-      align-items: center;
-    }
-    .eyebrow {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 8px 14px; border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(255,255,255,0.04); border-radius: 999px;
-      color: var(--muted); font-size: .86rem; letter-spacing: .02em;
-    }
-    .hero h2 {
-      font-size: clamp(2.4rem, 6vw, 4.8rem);
-      margin: 18px 0 16px;
-      line-height: 0.98;
-      letter-spacing: -0.04em;
-    }
-    .hero p {
-      margin: 0;
-      max-width: 62ch;
-      color: var(--muted);
-      font-size: 1.05rem;
-      line-height: 1.8;
-    }
-    .cta {
-      display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px;
-    }
-    .btn {
-      display: inline-flex; align-items: center; gap: 10px;
-      padding: 12px 18px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(255,255,255,0.04); color: var(--text);
-      box-shadow: var(--shadow);
-      transition: transform .18s ease, background .18s ease, border-color .18s ease;
-    }
-    .btn:hover { transform: translateY(-2px); background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.18); }
-    .btn.primary { background: linear-gradient(135deg, rgba(120,166,255,0.95), rgba(124,231,195,0.85)); color: #07111f; font-weight: 700; }
-
-    .hero-card {
-      background: linear-gradient(180deg, rgba(12,23,41,0.95), rgba(11,18,31,0.92));
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 22px;
-    }
-    .metric-grid {
-      display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
-    }
-    .metric {
-      padding: 16px; border-radius: 18px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
-    }
-    .metric b { display: block; font-size: 1.6rem; margin-bottom: 4px; }
-    .metric small { color: var(--muted); line-height: 1.5; }
-
-    .panel {
-      margin: 22px 0 0;
-      border-radius: var(--radius);
-      background: linear-gradient(180deg, rgba(18,31,54,0.92), rgba(12,21,37,0.92));
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
-    .panel-head {
-      padding: 18px 22px;
-      display: flex; justify-content: space-between; gap: 12px; align-items: center;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      flex-wrap: wrap;
-    }
-    .panel-head h3 { margin: 0; font-size: 1.1rem; }
-    .panel-head p { margin: 0; color: var(--muted); font-size: .95rem; }
-    .panel-body { padding: 18px 22px 22px; }
-
-    .compare {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 22px;
-      padding: 18px;
-    }
-    .card h4 { margin: 0 0 8px; font-size: 1.08rem; }
-    .card p { margin: 0 0 14px; color: var(--muted); line-height: 1.7; font-size: .96rem; }
-    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-    .pill {
-      font-size: .78rem; padding: 6px 10px; border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.12); color: var(--muted);
-      background: rgba(255,255,255,0.03);
-    }
-
-    .viz-box {
-      border-radius: 18px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
-      border: 1px solid rgba(255,255,255,0.08);
-      overflow: hidden;
-    }
-    svg { display: block; width: 100%; height: auto; }
-
-    .steps {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
-    }
-    .step {
-      padding: 18px; border-radius: 22px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
-    }
-    .step .num {
-      width: 34px; height: 34px; border-radius: 50%;
-      display: grid; place-items: center; font-weight: 800; margin-bottom: 10px;
-      background: rgba(120,166,255,0.16); color: #c9d8ff;
-      border: 1px solid rgba(120,166,255,0.25);
-    }
-    .step h5 { margin: 0 0 8px; font-size: 1rem; }
-    .step p { margin: 0; color: var(--muted); line-height: 1.7; font-size: .93rem; }
-
-    .chart-wrap { height: 360px; }
-    .chart-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-    .toggle {
-      cursor: default;
-      padding: 8px 12px; border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.12);
-      color: var(--muted);
-      background: rgba(255,255,255,0.03);
-      font-size: .88rem;
-    }
-    .toggle.active { color: #07111f; background: linear-gradient(135deg, rgba(120,166,255,0.95), rgba(124,231,195,0.9)); border-color: transparent; font-weight: 700; }
-
-    .footer {
-      padding: 28px 0 42px; color: var(--muted); font-size: .92rem;
-      display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-    }
-
-    @media (max-width: 980px) {
-      .hero, .compare, .steps { grid-template-columns: 1fr; }
-      .nav { align-items: flex-start; flex-direction: column; }
-      .navlinks { gap: 10px 14px; }
-    }
-
-    @media (max-width: 640px) {
-      .wrap { width: min(var(--max), calc(100% - 22px)); }
-      .hero { padding-top: 36px; }
-      .panel-body, .panel-head { padding-left: 16px; padding-right: 16px; }
-      .hero-card { padding: 16px; }
-      .metric-grid { grid-template-columns: 1fr; }
-      .chart-wrap { height: 300px; }
-    }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Perceptron vs SVM — Interactive Dashboard</title>
+<meta name="description" content="Interactive visual explanation of why SVM margins generalize better than Perceptron."/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07090f;--surface:#0e1118;--surface2:#12192a;
+  --border:#1c2133;--muted:#3a4460;--text:#c8d0e0;--bright:#eef1f8;
+  --blue:#4f8eff;--green:#2dd4a0;--red:#ff5f7e;--yellow:#f59e42;--purple:#7b5cf0;
+  --mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;overflow-x:hidden}
+nav{position:sticky;top:0;z-index:50;border-bottom:1px solid var(--border);background:rgba(7,9,15,.88);backdrop-filter:blur(14px)}
+.nav-inner{max-width:1120px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:52px;gap:16px}
+.nav-brand{font-family:var(--mono);font-size:13px;color:var(--bright);display:flex;align-items:center;gap:10px}
+.nav-dot{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 10px var(--blue);animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.nav-links{display:flex;gap:20px;font-size:13px;color:var(--muted)}
+.nav-links a{color:inherit;text-decoration:none;transition:color .15s}
+.nav-links a:hover{color:var(--bright)}
+.shell{max-width:1120px;margin:0 auto;padding:0 24px 80px}
+.hero{padding:60px 0 48px;border-bottom:1px solid var(--border)}
+.hero-eye{font-family:var(--mono);font-size:11px;color:var(--blue);letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
+.hero h1{font-size:clamp(2rem,5vw,3rem);font-weight:700;color:var(--bright);line-height:1.1;margin-bottom:16px;letter-spacing:-.02em}
+.hero-sub{max-width:580px;color:var(--text);font-size:15.5px;margin-bottom:32px}
+.hero-pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{font-family:var(--mono);font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid var(--border);color:var(--muted)}
+.pill.blue{border-color:rgba(79,142,255,.4);color:var(--blue)}
+.pill.green{border-color:rgba(45,212,160,.4);color:var(--green)}
+.pill.red{border-color:rgba(255,95,126,.4);color:var(--red)}
+.section{padding:52px 0;border-bottom:1px solid var(--border)}
+.section:last-child{border-bottom:none}
+.sec-eye{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px}
+.sec-title{font-size:20px;font-weight:600;color:var(--bright);margin-bottom:8px}
+.sec-desc{color:var(--text);font-size:14px;margin-bottom:24px;max-width:640px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:720px){.grid2,.grid3{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}
+.card-title{font-family:var(--mono);font-size:11px;color:var(--blue);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
+.card p,.card li{font-size:14px;color:var(--text)}
+.card ul{padding-left:16px}
+.card li{margin-bottom:5px}
+.canvas-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.canvas-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
+.canvas-bar-title{font-family:var(--mono);font-size:12px;color:var(--bright)}
+.canvas-bar-desc{font-size:12px;color:var(--muted)}
+canvas{display:block;cursor:crosshair}
+.controls{padding:14px 16px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.ctrl-btn{font-family:var(--mono);font-size:11px;padding:5px 14px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;transition:all .15s}
+.ctrl-btn:hover{border-color:var(--blue);color:var(--blue)}
+.ctrl-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.ctrl-btn.danger{border-color:rgba(255,95,126,.4);color:var(--red)}
+.ctrl-btn.danger:hover{background:var(--red);border-color:var(--red);color:#fff}
+.ctrl-label{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.slider-wrap{display:flex;align-items:center;gap:10px}
+input[type=range]{accent-color:var(--blue);flex:1;min-width:100px}
+.slider-val{font-family:var(--mono);font-size:12px;color:var(--bright);min-width:36px}
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px}
+.legend-row{display:flex;align-items:center;font-size:12px;color:var(--text);gap:16px;flex-wrap:wrap}
+.stat-row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
+.stat-row:last-child{border-bottom:none}
+.stat-row span:first-child{color:var(--muted)}
+.stat-row span:last-child{font-family:var(--mono);color:var(--bright)}
+.formula{background:#080a12;border:1px solid var(--border);border-left:3px solid var(--purple);border-radius:8px;padding:14px 18px;font-family:var(--mono);font-size:13px;color:var(--bright);margin-top:14px}
+.formula small{display:block;font-size:11px;color:var(--muted);margin-bottom:6px}
+.timeline{display:flex;flex-direction:column;gap:0}
+.tl-item{display:grid;grid-template-columns:24px 1fr;gap:14px;padding-bottom:22px}
+.tl-item:last-child{padding-bottom:0}
+.tl-dot{width:10px;height:10px;border-radius:50%;background:var(--blue);margin-top:5px;margin-left:7px;position:relative;z-index:1}
+.tl-item:not(:last-child) .tl-dot::after{content:'';position:absolute;left:50%;top:13px;transform:translateX(-50%);width:1px;height:calc(100% + 12px);background:var(--border)}
+.tl-title{font-size:14px;font-weight:600;color:var(--bright);margin-bottom:3px}
+.tl-desc{font-size:13px;color:var(--text)}
+.footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.footer a{color:var(--blue);text-decoration:none}
+</style>
 </head>
 <body>
-  <header>
-    <div class="wrap nav">
-      <div class="brand">
-        <div class="logo">S</div>
-        <div>
-          <h1>Perceptron vs SVM</h1>
-          <span>Interactive GitHub Pages explainer</span>
-        </div>
-      </div>
-      <nav class="navlinks">
-        <a href="#compare">Compare</a>
-        <a href="#intuition">Intuition</a>
-        <a href="#robustness">Robustness</a>
-        <a href="#takeaways">Takeaways</a>
-      </nav>
+<nav>
+  <div class="nav-inner">
+    <div class="nav-brand"><div class="nav-dot"></div>perceptron-vs-svm</div>
+    <div class="nav-links">
+      <a href="#boundary">Boundary</a>
+      <a href="#margin">Margin</a>
+      <a href="#noise">Noise</a>
+      <a href="#intuition">Intuition</a>
     </div>
-  </header>
+  </div>
+</nav>
+<div class="shell">
 
-  <main class="wrap">
-    <section class="hero">
-      <div>
-        <div class="eyebrow">From notebook to polished web experience</div>
-        <h2>Why SVM generalizes better than a Perceptron.</h2>
-        <p>
-          This page turns the notebook’s core idea into a visual story: both models can separate data,
-          but SVM keeps a safe margin from the boundary, which makes it more stable when the data changes
-          or when outliers and noise appear.
-        </p>
-        <div class="cta">
-          <a class="btn primary" href="#compare">Explore the comparison</a>
-          <a class="btn" href="#robustness">See the noise chart</a>
-        </div>
-      </div>
+<div class="hero">
+  <p class="hero-eye">Interactive · Classification · Margin Theory</p>
+  <h1>Perceptron vs SVM<br><span style="color:var(--blue)">—</span> Margin &amp; Overfitting</h1>
+  <p class="hero-sub">Both models separate data. Only one keeps a safe distance. Drag points, adjust noise, and see exactly why the margin matters for generalisation.</p>
+  <div class="hero-pills">
+    <span class="pill blue">● Live canvas</span>
+    <span class="pill green">Drag &amp; drop points</span>
+    <span class="pill red">Real-time boundaries</span>
+    <span class="pill">scikit-learn equivalent</span>
+  </div>
+</div>
 
-      <div class="hero-card">
-        <div class="metric-grid">
-          <div class="metric">
-            <b>Perceptron</b>
-            <small>Stops as soon as data is classified correctly. No explicit margin.</small>
-          </div>
-          <div class="metric">
-            <b>SVM</b>
-            <small>Maximizes the margin, giving a more robust decision boundary.</small>
-          </div>
-          <div class="metric">
-            <b>Outlier effect</b>
-            <small>A single point can pull the perceptron boundary closer.</small>
-          </div>
-          <div class="metric">
-            <b>Generalization</b>
-            <small>Margin-based separation tends to handle new data better.</small>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="compare" class="panel">
-      <div class="panel-head">
+<!-- SECTION 1 -->
+<div class="section" id="boundary">
+  <p class="sec-eye">01 — Decision Boundary</p>
+  <p class="sec-title">Draw your own dataset — watch both models react</p>
+  <p class="sec-desc">Click to add Class +1 (●) or Class −1 (■). Drag existing points. Both boundaries update in real time.</p>
+  <div class="grid2">
+    <div class="canvas-panel">
+      <div class="canvas-bar">
         <div>
-          <h3>Decision boundary comparison</h3>
-          <p>Same training data, two behaviors: exact separation versus margin-aware separation.</p>
+          <div class="canvas-bar-title" style="color:var(--red)">Perceptron</div>
+          <div class="canvas-bar-desc">Any separating line — no margin objective</div>
         </div>
-        <div class="pill-row" style="margin:0;">
-          <span class="pill">Synthetic 2D data</span>
-          <span class="pill">One outlier</span>
-          <span class="pill">Linear models</span>
-        </div>
-      </div>
-      <div class="panel-body compare">
-        <div class="card">
-          <h4>Perceptron</h4>
-          <div class="pill-row">
-            <span class="pill">Boundary follows training points</span>
-            <span class="pill">No margin objective</span>
-          </div>
-          <p>
-            The perceptron is satisfied when the data is separable. That makes it fast and elegant,
-            but it can become sensitive to borderline points and outliers.
-          </p>
-          <div class="viz-box">
-            <svg viewBox="0 0 560 360" role="img" aria-label="Perceptron boundary illustration">
-              <defs>
-                <linearGradient id="g1" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0%" stop-color="#78a6ff" stop-opacity="0.35" />
-                  <stop offset="100%" stop-color="#ff7d7d" stop-opacity="0.18" />
-                </linearGradient>
-              </defs>
-              <rect width="560" height="360" fill="rgba(255,255,255,0.02)"/>
-              <path d="M0 280 C110 240, 180 220, 260 185 S400 95, 560 55 L560 360 L0 360 Z" fill="url(#g1)"/>
-              <line x1="50" y1="300" x2="510" y2="80" stroke="#ffb1b1" stroke-width="4" stroke-dasharray="10 10" opacity="0.85"/>
-              <g fill="#78a6ff" opacity="0.95">
-                <circle cx="100" cy="95" r="9"/>
-                <circle cx="155" cy="135" r="9"/>
-                <circle cx="190" cy="88" r="9"/>
-                <circle cx="245" cy="140" r="9"/>
-                <circle cx="300" cy="108" r="9"/>
-                <circle cx="355" cy="120" r="9"/>
-                <circle cx="415" cy="86" r="9"/>
-              </g>
-              <g fill="#ff7d7d" opacity="0.95">
-                <rect x="95" y="250" width="18" height="18" rx="4"/>
-                <rect x="150" y="220" width="18" height="18" rx="4"/>
-                <rect x="220" y="250" width="18" height="18" rx="4"/>
-                <rect x="285" y="205" width="18" height="18" rx="4"/>
-                <rect x="350" y="235" width="18" height="18" rx="4"/>
-                <rect x="430" y="225" width="18" height="18" rx="4"/>
-              </g>
-              <circle cx="425" cy="214" r="10" fill="#ffd166" stroke="#2b1f00" stroke-width="2"/>
-              <text x="28" y="36" fill="#e8eef9" font-size="18" font-weight="700">Perceptron boundary</text>
-              <text x="28" y="58" fill="#a7b4cc" font-size="13">A boundary that is correct, but not margin-aware</text>
-            </svg>
-          </div>
-        </div>
-
-        <div class="card">
-          <h4>SVM</h4>
-          <div class="pill-row">
-            <span class="pill">Maximizes margin</span>
-            <span class="pill">Supports better stability</span>
-          </div>
-          <p>
-            SVM searches for a separator with the widest possible cushion between classes. That cushion
-            is what makes the model more resilient to small perturbations in the data.
-          </p>
-          <div class="viz-box">
-            <svg viewBox="0 0 560 360" role="img" aria-label="SVM margin illustration">
-              <defs>
-                <linearGradient id="g2" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0%" stop-color="#7ce7c3" stop-opacity="0.24" />
-                  <stop offset="100%" stop-color="#78a6ff" stop-opacity="0.18" />
-                </linearGradient>
-              </defs>
-              <rect width="560" height="360" fill="rgba(255,255,255,0.02)"/>
-              <path d="M0 288 C110 250, 180 232, 260 188 S400 95, 560 52 L560 360 L0 360 Z" fill="url(#g2)"/>
-              <line x1="55" y1="300" x2="505" y2="85" stroke="#e8eef9" stroke-width="3" opacity="0.9"/>
-              <line x1="40" y1="323" x2="485" y2="109" stroke="#78a6ff" stroke-width="3" stroke-dasharray="9 9" opacity="0.9"/>
-              <line x1="72" y1="278" x2="526" y2="65" stroke="#78a6ff" stroke-width="3" stroke-dasharray="9 9" opacity="0.9"/>
-              <g fill="#78a6ff" opacity="0.96">
-                <circle cx="105" cy="95" r="9"/>
-                <circle cx="160" cy="130" r="9"/>
-                <circle cx="195" cy="88" r="9"/>
-                <circle cx="250" cy="142" r="9"/>
-                <circle cx="305" cy="106" r="9"/>
-                <circle cx="360" cy="118" r="9"/>
-                <circle cx="418" cy="86" r="9"/>
-              </g>
-              <g fill="#ff7d7d" opacity="0.96">
-                <rect x="95" y="250" width="18" height="18" rx="4"/>
-                <rect x="150" y="220" width="18" height="18" rx="4"/>
-                <rect x="220" y="250" width="18" height="18" rx="4"/>
-                <rect x="285" y="205" width="18" height="18" rx="4"/>
-                <rect x="350" y="235" width="18" height="18" rx="4"/>
-                <rect x="430" y="225" width="18" height="18" rx="4"/>
-              </g>
-              <circle cx="425" cy="214" r="10" fill="#ffd166" stroke="#2b1f00" stroke-width="2"/>
-              <text x="28" y="36" fill="#e8eef9" font-size="18" font-weight="700">SVM boundary + margin</text>
-              <text x="28" y="58" fill="#a7b4cc" font-size="13">The model explicitly tries to keep the classes apart</text>
-            </svg>
-          </div>
+        <div class="legend-row">
+          <span><span class="legend-dot" style="background:var(--blue)"></span>+1</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:var(--red);border-radius:2px;margin-right:5px"></span>−1</span>
         </div>
       </div>
-    </section>
-
-    <section id="intuition" class="panel">
-      <div class="panel-head">
-        <div>
-          <h3>Intuitive narrative</h3>
-          <p>Convert the notebook’s logic into an easy mental model.</p>
-        </div>
+      <canvas id="cvP" height="300"></canvas>
+      <div class="controls">
+        <span class="ctrl-label">Add:</span>
+        <button class="ctrl-btn active" id="btnP1" onclick="setMode('p1')">Class +1 ●</button>
+        <button class="ctrl-btn" id="btnPm1" onclick="setMode('pm1')">Class −1 ■</button>
+        <button class="ctrl-btn danger" onclick="clearPoints()">Clear</button>
+        <button class="ctrl-btn" onclick="addOutlier()" title="Adds a point near the wrong class">+ Outlier</button>
       </div>
-      <div class="panel-body steps">
-        <div class="step">
-          <div class="num">1</div>
-          <h5>Start with separability</h5>
-          <p>Both methods try to find a line that separates classes in the training set.</p>
-        </div>
-        <div class="step">
-          <div class="num">2</div>
-          <h5>Ask what happens near the line</h5>
-          <p>The perceptron only cares about being correct; SVM also cares about distance from the boundary.</p>
-        </div>
-        <div class="step">
-          <div class="num">3</div>
-          <h5>Introduce the outlier</h5>
-          <p>A single tricky point can pull a no-margin boundary toward unstable territory.</p>
-        </div>
-        <div class="step">
-          <div class="num">4</div>
-          <h5>Prefer the wider gap</h5>
-          <p>Margin acts like breathing room, which usually improves robustness on new samples.</p>
-        </div>
-      </div>
-    </section>
-
-    <section id="robustness" class="panel">
-      <div class="panel-head">
-        <div>
-          <h3>Noise robustness</h3>
-          <p>In the notebook, the SVM curve stays steadier as noise increases.</p>
-        </div>
-        <div class="chart-controls" aria-label="Chart legend">
-          <span class="toggle active">Perceptron</span>
-          <span class="toggle active">SVM</span>
-        </div>
-      </div>
-      <div class="panel-body">
-        <div class="viz-box chart-wrap">
-          <svg viewBox="0 0 1120 360" role="img" aria-label="Noise robustness chart">
-            <defs>
-              <linearGradient id="area1" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stop-color="#ff7d7d" stop-opacity="0.22" />
-                <stop offset="100%" stop-color="#ff7d7d" stop-opacity="0" />
-              </linearGradient>
-              <linearGradient id="area2" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stop-color="#78a6ff" stop-opacity="0.22" />
-                <stop offset="100%" stop-color="#78a6ff" stop-opacity="0" />
-              </linearGradient>
-            </defs>
-            <rect width="1120" height="360" fill="rgba(255,255,255,0.02)"/>
-            <g stroke="rgba(255,255,255,0.10)" stroke-width="1">
-              <line x1="80" y1="40" x2="80" y2="300" />
-              <line x1="80" y1="300" x2="1050" y2="300" />
-              <line x1="80" y1="248" x2="1050" y2="248" />
-              <line x1="80" y1="196" x2="1050" y2="196" />
-              <line x1="80" y1="144" x2="1050" y2="144" />
-              <line x1="80" y1="92" x2="1050" y2="92" />
-              <line x1="80" y1="40" x2="1050" y2="40" />
-            </g>
-            <path d="M80 95 L188 118 L296 136 L404 152 L512 178 L620 198 L728 220 L836 244 L944 256 L1050 272 L1050 300 L80 300 Z" fill="url(#area1)"/>
-            <path d="M80 80 L188 90 L296 100 L404 106 L512 113 L620 121 L728 130 L836 138 L944 144 L1050 150 L1050 300 L80 300 Z" fill="url(#area2)"/>
-            <path d="M80 95 L188 118 L296 136 L404 152 L512 178 L620 198 L728 220 L836 244 L944 256 L1050 272" fill="none" stroke="#ff8f8f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M80 80 L188 90 L296 100 L404 106 L512 113 L620 121 L728 130 L836 138 L944 144 L1050 150" fill="none" stroke="#78a6ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-            <g fill="#ff7d7d">
-              <circle cx="80" cy="95" r="6"/>
-              <circle cx="188" cy="118" r="6"/>
-              <circle cx="296" cy="136" r="6"/>
-              <circle cx="404" cy="152" r="6"/>
-              <circle cx="512" cy="178" r="6"/>
-              <circle cx="620" cy="198" r="6"/>
-              <circle cx="728" cy="220" r="6"/>
-              <circle cx="836" cy="244" r="6"/>
-              <circle cx="944" cy="256" r="6"/>
-              <circle cx="1050" cy="272" r="6"/>
-            </g>
-            <g fill="#78a6ff">
-              <circle cx="80" cy="80" r="6"/>
-              <circle cx="188" cy="90" r="6"/>
-              <circle cx="296" cy="100" r="6"/>
-              <circle cx="404" cy="106" r="6"/>
-              <circle cx="512" cy="113" r="6"/>
-              <circle cx="620" cy="121" r="6"/>
-              <circle cx="728" cy="130" r="6"/>
-              <circle cx="836" cy="138" r="6"/>
-              <circle cx="944" cy="144" r="6"/>
-              <circle cx="1050" cy="150" r="6"/>
-            </g>
-            <text x="32" y="40" fill="#e8eef9" font-size="18" font-weight="700">Accuracy vs. added noise</text>
-            <text x="32" y="60" fill="#a7b4cc" font-size="13">Illustrative view matching the notebook’s trend</text>
-            <text x="84" y="328" fill="#a7b4cc" font-size="12">0.0</text>
-            <text x="177" y="328" fill="#a7b4cc" font-size="12">0.2</text>
-            <text x="285" y="328" fill="#a7b4cc" font-size="12">0.4</text>
-            <text x="393" y="328" fill="#a7b4cc" font-size="12">0.6</text>
-            <text x="501" y="328" fill="#a7b4cc" font-size="12">0.8</text>
-            <text x="609" y="328" fill="#a7b4cc" font-size="12">1.0</text>
-            <text x="717" y="328" fill="#a7b4cc" font-size="12">1.2</text>
-            <text x="825" y="328" fill="#a7b4cc" font-size="12">1.4</text>
-            <text x="933" y="328" fill="#a7b4cc" font-size="12">1.6</text>
-            <text x="45" y="304" fill="#a7b4cc" font-size="12">0%</text>
-            <text x="40" y="252" fill="#a7b4cc" font-size="12">20%</text>
-            <text x="40" y="200" fill="#a7b4cc" font-size="12">40%</text>
-            <text x="40" y="148" fill="#a7b4cc" font-size="12">60%</text>
-            <text x="40" y="96" fill="#a7b4cc" font-size="12">80%</text>
-            <text x="34" y="44" fill="#a7b4cc" font-size="12">100%</text>
-            <g transform="translate(770,52)">
-              <rect x="0" y="0" width="280" height="72" rx="16" fill="rgba(7,17,31,0.55)" stroke="rgba(255,255,255,0.12)"/>
-              <circle cx="24" cy="24" r="6" fill="#ff7d7d"/>
-              <text x="40" y="28" fill="#e8eef9" font-size="13">Perceptron drops faster</text>
-              <circle cx="24" cy="48" r="6" fill="#78a6ff"/>
-              <text x="40" y="52" fill="#e8eef9" font-size="13">SVM stays more stable</text>
-            </g>
-          </svg>
-        </div>
-      </div>
-    </section>
-
-    <section id="takeaways" class="panel">
-      <div class="panel-head">
-        <div>
-          <h3>Takeaways</h3>
-          <p>The notebook’s conclusion, distilled for a public-facing project page.</p>
-        </div>
-      </div>
-      <div class="panel-body compare">
-        <div class="card">
-          <h4>What the page communicates</h4>
-          <p>
-            Perceptron is a correct-separation model; SVM is a correct-separation model with a built-in preference
-            for wider margins. That distinction matters when the data is imperfect, noisy, or slightly shifted.
-          </p>
-          <div class="pill-row">
-            <span class="pill">Margin = safety buffer</span>
-            <span class="pill">Outliers matter</span>
-            <span class="pill">Generalization improves</span>
-          </div>
-        </div>
-        <div class="card">
-          <h4>Suggested GitHub Pages setup</h4>
-          <p>
-            Set Pages to deploy from the <strong>main</strong> branch and choose the <strong>/docs</strong> folder.
-            This landing page is already prepared for that workflow.
-          </p>
-          <div class="pill-row">
-            <span class="pill">main /docs</span>
-            <span class="pill">Static HTML</span>
-            <span class="pill">No build step</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <div class="footer">
-      <span>Built from the notebook “Perceptron vs SVM – Margin and Overfitting”.</span>
-      <span>Designed for BenyaminMahdavifar/perceptron-vs-svm</span>
     </div>
-  </main>
+    <div class="canvas-panel">
+      <div class="canvas-bar">
+        <div>
+          <div class="canvas-bar-title" style="color:var(--blue)">SVM (linear kernel)</div>
+          <div class="canvas-bar-desc">Maximises margin — same dataset</div>
+        </div>
+        <div class="legend-row">
+          <span style="color:var(--yellow);font-size:12px">◎ support vectors</span>
+          <span style="color:var(--green);font-size:12px">green = margin</span>
+        </div>
+      </div>
+      <canvas id="cvS" height="300"></canvas>
+      <div class="controls">
+        <span class="ctrl-label">C:</span>
+        <div class="slider-wrap" style="flex:1">
+          <input type="range" id="cSlider" min="-2" max="3" step=".1" value="2">
+          <span class="slider-val" id="cVal">100</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="grid2" style="margin-top:16px">
+    <div class="card">
+      <div class="card-title">Live stats</div>
+      <div class="stat-row"><span>Points (class +1)</span><span id="st-p1">6</span></div>
+      <div class="stat-row"><span>Points (class −1)</span><span id="st-pm1">6</span></div>
+      <div class="stat-row"><span>Perceptron train accuracy</span><span id="st-pacc">—</span></div>
+      <div class="stat-row"><span>SVM margin width γ</span><span id="st-margin">—</span></div>
+      <div class="stat-row"><span>Support vectors</span><span id="st-sv">—</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Reading the canvas</div>
+      <ul>
+        <li>The <strong style="color:var(--red)">dashed red line</strong> is the Perceptron — it can hug points closely.</li>
+        <li>The <strong style="color:var(--bright)">white line</strong> is the SVM boundary — centred in the margin.</li>
+        <li>The <strong style="color:var(--green)">green band</strong> is the SVM margin γ = 2/‖w‖.</li>
+        <li><strong style="color:var(--yellow)">Yellow</strong> rings mark support vectors — the only points that define the SVM.</li>
+        <li>Click <em>+ Outlier</em> and watch the Perceptron shift while SVM stays stable.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 2 -->
+<div class="section" id="margin">
+  <p class="sec-eye">02 — The Margin</p>
+  <p class="sec-title">Why wider is better</p>
+  <p class="sec-desc">The margin is the distance between the two parallel support hyperplanes. SVM maximises this — the Perceptron ignores it entirely.</p>
+  <div class="grid2">
+    <div>
+      <div class="canvas-panel">
+        <div class="canvas-bar"><div class="canvas-bar-title">Margin geometry</div></div>
+        <canvas id="cvMargin" height="240"></canvas>
+      </div>
+      <div class="formula"><small>SVM primal objective</small>minimise ½‖w‖²  s.t.  yᵢ(w·xᵢ + b) ≥ 1</div>
+      <div class="formula" style="margin-top:10px"><small>Margin width</small>γ = 2 / ‖w‖</div>
+    </div>
+    <div>
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-dot" style="background:var(--red)"></div>
+          <div><div class="tl-title">Perceptron stops here</div><div class="tl-desc">Once every training point is correctly classified, learning halts — regardless of how close the boundary is to any point.</div></div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot" style="background:var(--yellow)"></div>
+          <div><div class="tl-title">SVM finds the maximum margin</div><div class="tl-desc">SVM solves a convex QP that explicitly maximises the perpendicular gap between the two closest parallel margin lines.</div></div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot" style="background:var(--green)"></div>
+          <div><div class="tl-title">Only support vectors matter</div><div class="tl-desc">The boundary is defined entirely by the handful of points on the margin edge. Remove all other points — boundary unchanged.</div></div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot" style="background:var(--blue)"></div>
+          <div><div class="tl-title">VC theory guarantee</div><div class="tl-desc">A larger margin directly reduces the generalisation error bound — this is the theoretical reason why SVM works.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 3 -->
+<div class="section" id="noise">
+  <p class="sec-eye">03 — Noise Robustness</p>
+  <p class="sec-title">Accuracy vs. noise — interactive</p>
+  <p class="sec-desc">Drag the slider to increase Gaussian noise σ on the test set. SVM stays steadier for longer.</p>
+  <div class="canvas-panel">
+    <div class="canvas-bar">
+      <div class="canvas-bar-title">Test accuracy under noise</div>
+      <div class="legend-row">
+        <span><span style="display:inline-block;width:24px;height:3px;background:var(--red);border-radius:2px;vertical-align:middle;margin-right:6px"></span>Perceptron</span>
+        <span><span style="display:inline-block;width:24px;height:3px;background:var(--blue);border-radius:2px;vertical-align:middle;margin-right:6px"></span>SVM</span>
+      </div>
+    </div>
+    <canvas id="cvNoise" height="260"></canvas>
+    <div class="controls">
+      <span class="ctrl-label">Noise σ:</span>
+      <div class="slider-wrap" style="flex:1">
+        <input type="range" id="noiseSlider" min="0" max="1.5" step=".02" value="0">
+        <span class="slider-val" id="noiseVal">0.00</span>
+      </div>
+      <span class="ctrl-label" style="margin-left:12px">Perceptron:</span>
+      <span class="slider-val" id="noiseAccP" style="color:var(--red)">98.0%</span>
+      <span class="ctrl-label">SVM:</span>
+      <span class="slider-val" id="noiseAccS" style="color:var(--blue)">98.0%</span>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 4 -->
+<div class="section" id="intuition">
+  <p class="sec-eye">04 — Intuition</p>
+  <p class="sec-title">The student analogy</p>
+  <div class="grid3">
+    <div class="card">
+      <div class="card-title">Perceptron</div>
+      <p>Like a student who memorises the <em>exact</em> answers to every training question — even the flawed ones. When the exam changes slightly, they stumble.</p>
+      <div style="margin-top:12px;font-size:13px;color:var(--red)">→ Overfits boundary details</div>
+    </div>
+    <div class="card">
+      <div class="card-title">SVM</div>
+      <p>Like a student who learns the <em>general rule</em> and ignores noise. The margin is the buffer they keep — room to be wrong on small perturbations without misclassifying.</p>
+      <div style="margin-top:12px;font-size:13px;color:var(--green)">→ Learns structural rule</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Key insight</div>
+      <p>SVM only cares about points <em>on</em> the margin edge. Points already far from the boundary contribute nothing — making the model robust to their small movements.</p>
+      <div class="formula" style="margin-top:12px;font-size:12px"><small>Effective training set</small>support vectors ⊂ training set</div>
+    </div>
+  </div>
+</div>
+
+<footer class="footer">
+  <span>© <a href="https://github.com/BenyaminMahdavifar">BenyaminMahdavifar</a></span>
+  <span>perceptron-vs-svm · GitHub Pages</span>
+</footer>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────
+let pts=[];
+let addMode='p1';
+let dragIdx=-1;
+
+// ── Perceptron (online gradient) ───────────────────────
+function trainPerceptron(pts){
+  if(!pts.some(p=>p.c===1)||!pts.some(p=>p.c===-1))return null;
+  let w=[0,0],b=0;
+  for(let iter=0;iter<3000;iter++){
+    let err=0;
+    for(const p of pts){
+      if(p.c*(w[0]*p.x+w[1]*p.y+b)<=0){
+        w[0]+=.05*p.c*p.x;w[1]+=.05*p.c*p.y;b+=.05*p.c;err++;
+      }
+    }
+    if(!err)break;
+  }
+  return{w,b};
+}
+
+// ── SMO-lite SVM ───────────────────────────────────────
+function trainSVM(pts,C){
+  if(pts.length<4||!pts.some(p=>p.c===1)||!pts.some(p=>p.c===-1))return null;
+  const n=pts.length;
+  const alpha=new Float64Array(n);
+  let bias=0;
+  const K=(i,j)=>pts[i].x*pts[j].x+pts[i].y*pts[j].y;
+  const dec=(k)=>{let s=bias;for(let l=0;l<n;l++)s+=alpha[l]*pts[l].c*K(l,k);return s;};
+  const tol=1e-4;
+  let passes=0;
+  while(passes<300){
+    let changed=0;
+    for(let i=0;i<n;i++){
+      const Ei=dec(i)-pts[i].c;
+      if((pts[i].c*Ei<-tol&&alpha[i]<C)||(pts[i].c*Ei>tol&&alpha[i]>0)){
+        let j=(i+1+Math.floor(Math.random()*(n-1)))%n;
+        const Ej=dec(j)-pts[j].c;
+        const ai0=alpha[i],aj0=alpha[j];
+        let L,H;
+        if(pts[i].c!==pts[j].c){L=Math.max(0,aj0-ai0);H=Math.min(C,C+aj0-ai0);}
+        else{L=Math.max(0,ai0+aj0-C);H=Math.min(C,ai0+aj0);}
+        if(L>=H)continue;
+        const eta=2*K(i,j)-K(i,i)-K(j,j);
+        if(eta>=0)continue;
+        alpha[j]=Math.min(H,Math.max(L,alpha[j]-pts[j].c*(Ei-Ej)/eta));
+        if(Math.abs(alpha[j]-aj0)<1e-5)continue;
+        alpha[i]+=pts[i].c*pts[j].c*(aj0-alpha[j]);
+        const b1=bias-Ei-pts[i].c*(alpha[i]-ai0)*K(i,i)-pts[j].c*(alpha[j]-aj0)*K(i,j);
+        const b2=bias-Ej-pts[i].c*(alpha[i]-ai0)*K(i,j)-pts[j].c*(alpha[j]-aj0)*K(j,j);
+        bias=(alpha[i]>0&&alpha[i]<C)?b1:(alpha[j]>0&&alpha[j]<C)?b2:(b1+b2)/2;
+        changed++;
+      }
+    }
+    passes=changed?0:passes+1;
+  }
+  let w=[0,0];
+  for(let i=0;i<n;i++){w[0]+=alpha[i]*pts[i].c*pts[i].x;w[1]+=alpha[i]*pts[i].c*pts[i].y;}
+  const svIdx=[];for(let i=0;i<n;i++)if(alpha[i]>1e-4)svIdx.push(i);
+  const nrm=Math.sqrt(w[0]**2+w[1]**2);
+  return{w,b:bias,svIdx,margin:nrm>1e-9?2/nrm:0};
+}
+
+// ── Canvas helpers ─────────────────────────────────────
+function dpr(){return window.devicePixelRatio||1}
+const BLU='#4f8eff',RED='#ff5f7e',GRN='#2dd4a0',YEL='#f59e42',WHT='#eef1f8';
+
+// Fixed dims — init once, never resize on interaction
+const CANVAS_H={cvP:300,cvS:300,cvMargin:240,cvNoise:260};
+const _init=new Set();
+function setupCanvas(cv){
+  if(_init.has(cv.id))return;
+  const h=CANVAS_H[cv.id]||300;
+  const w=cv.parentElement.clientWidth;
+  const r=dpr();
+  cv.width=w*r; cv.height=h*r;
+  cv.style.width=w+'px'; cv.style.height=h+'px';
+  cv.getContext('2d').scale(r,r);
+  _init.add(cv.id);
+}
+const W=cv=>parseInt(cv.style.width)||cv.clientWidth;
+const H=cv=>parseInt(cv.style.height)||CANVAS_H[cv.id]||300;
+const toData=(cv,px,py)=>({x:px/W(cv),y:py/H(cv)});
+const toPx=(cv,dx,dy)=>({x:dx*W(cv),y:dy*H(cv)});
+
+function drawBg(ctx,cv){
+  ctx.clearRect(0,0,W(cv),H(cv));
+  ctx.fillStyle='#0e1118';ctx.fillRect(0,0,W(cv),H(cv));
+  ctx.strokeStyle='rgba(255,255,255,.04)';ctx.lineWidth=1;
+  for(let x=0;x<=8;x++){const px=x/8*W(cv);ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H(cv));ctx.stroke();}
+  for(let y=0;y<=6;y++){const py=y/6*H(cv);ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W(cv),py);ctx.stroke();}
+}
+
+function drawDecisionLine(ctx,cv,w,b,color,dash){
+  if(!w||w[1]===0)return;
+  const y=(x)=>-(w[0]*x+b)/w[1];
+  const p0=toPx(cv,0,y(0)),p1=toPx(cv,1,y(1));
+  ctx.save();ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.setLineDash(dash||[]);
+  ctx.beginPath();ctx.moveTo(p0.x,p0.y);ctx.lineTo(p1.x,p1.y);ctx.stroke();
+  ctx.setLineDash([]);ctx.restore();
+}
+
+function drawMarginBand(ctx,cv,w,b){
+  if(!w||w[1]===0)return;
+  const nrm=Math.sqrt(w[0]**2+w[1]**2);
+  const s=1/nrm;
+  const yShift=(x,shift)=>-(w[0]*x+b+shift)/w[1];
+  const corners=[
+    toPx(cv,0,yShift(0,s)),toPx(cv,1,yShift(1,s)),
+    toPx(cv,1,yShift(1,-s)),toPx(cv,0,yShift(0,-s))
+  ];
+  ctx.save();ctx.globalAlpha=.13;ctx.fillStyle=GRN;
+  ctx.beginPath();ctx.moveTo(corners[0].x,corners[0].y);
+  corners.forEach(c=>ctx.lineTo(c.x,c.y));ctx.closePath();ctx.fill();ctx.globalAlpha=1;ctx.restore();
+  [s,-s].forEach(sh=>{
+    const p0=toPx(cv,0,yShift(0,sh)),p1=toPx(cv,1,yShift(1,sh));
+    ctx.save();ctx.strokeStyle=GRN;ctx.lineWidth=1.5;ctx.setLineDash([6,4]);
+    ctx.beginPath();ctx.moveTo(p0.x,p0.y);ctx.lineTo(p1.x,p1.y);ctx.stroke();
+    ctx.setLineDash([]);ctx.restore();
+  });
+}
+
+function drawPoints(ctx,cv,svIdx){
+  for(let i=0;i<pts.length;i++){
+    const p=pts[i];const{x,y}=toPx(cv,p.x,p.y);
+    ctx.save();
+    if(svIdx&&svIdx.includes(i)){
+      ctx.strokeStyle=YEL;ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(x,y,13,0,Math.PI*2);ctx.stroke();
+    }
+    ctx.fillStyle=p.c===1?BLU:RED;
+    if(p.c===1){ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fill();}
+    else{ctx.fillRect(x-6,y-6,12,12);}
+    ctx.restore();
+  }
+}
+
+// ── Main redraw ────────────────────────────────────────
+function redraw(){
+  const ctxP=cvP.getContext('2d'),ctxS=cvS.getContext('2d');
+  ctxP.clearRect(0,0,W(cvP),H(cvP));ctxS.clearRect(0,0,W(cvS),H(cvS));
+  drawBg(ctxP,cvP);drawBg(ctxS,cvS);
+
+  const mP=trainPerceptron(pts);
+  const C=Math.pow(10,parseFloat(document.getElementById('cSlider').value));
+  const mS=trainSVM(pts,C);
+
+  if(mP)drawDecisionLine(ctxP,cvP,mP.w,mP.b,RED,[10,6]);
+  drawPoints(ctxP,cvP,[]);
+
+  if(mS){drawMarginBand(ctxS,cvS,mS.w,mS.b);drawDecisionLine(ctxS,cvS,mS.w,mS.b,WHT,[]);drawPoints(ctxS,cvS,mS.svIdx);}
+  else drawPoints(ctxS,cvS,[]);
+
+  // stats
+  document.getElementById('st-p1').textContent=pts.filter(p=>p.c===1).length;
+  document.getElementById('st-pm1').textContent=pts.filter(p=>p.c===-1).length;
+  if(mP){const acc=pts.filter(p=>Math.sign(mP.w[0]*p.x+mP.w[1]*p.y+mP.b)===p.c).length/pts.length;document.getElementById('st-pacc').textContent=(acc*100).toFixed(0)+'%';}
+  else document.getElementById('st-pacc').textContent='—';
+  document.getElementById('st-margin').textContent=mS?mS.margin.toFixed(3):'—';
+  document.getElementById('st-sv').textContent=mS?mS.svIdx.length:'—';
+}
+
+// ── Events ─────────────────────────────────────────────
+const cvP=document.getElementById('cvP');
+const cvS=document.getElementById('cvS');
+
+function setMode(m){
+  addMode=m;
+  document.getElementById('btnP1').classList.toggle('active',m==='p1');
+  document.getElementById('btnPm1').classList.toggle('active',m==='pm1');
+}
+function clearPoints(){pts=[];redraw();}
+function addOutlier(){pts.push({x:.52+Math.random()*.08,y:.38+Math.random()*.08,c:addMode==='p1'?1:-1});redraw();}
+
+function getNear(cv,mx,my){
+  for(let i=pts.length-1;i>=0;i--){const{x,y}=toPx(cv,pts[i].x,pts[i].y);if((x-mx)**2+(y-my)**2<225)return i;}return -1;
+}
+function evXY(cv,e){const r=cv.getBoundingClientRect();return{mx:e.clientX-r.left,my:e.clientY-r.top};}
+
+[cvP,cvS].forEach(cv=>{
+  cv.addEventListener('mousedown',e=>{
+    const{mx,my}=evXY(cv,e);
+    const ni=getNear(cv,mx,my);
+    if(ni>=0){dragIdx=ni;return;}
+    const d=toData(cv,mx,my);
+    pts.push({x:d.x,y:d.y,c:addMode==='p1'?1:-1});
+    redraw();
+  });
+  cv.addEventListener('mousemove',e=>{
+    if(dragIdx<0)return;
+    const{mx,my}=evXY(cv,e);
+    const d=toData(cv,mx,my);
+    pts[dragIdx].x=Math.max(.01,Math.min(.99,d.x));
+    pts[dragIdx].y=Math.max(.01,Math.min(.99,d.y));
+    redraw();
+  });
+  cv.addEventListener('mouseup',()=>dragIdx=-1);
+  cv.addEventListener('mouseleave',()=>dragIdx=-1);
+  cv.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];const{mx,my}=evXY(cv,t);const ni=getNear(cv,mx,my);if(ni>=0){dragIdx=ni;return;}const d=toData(cv,mx,my);pts.push({x:d.x,y:d.y,c:addMode==='p1'?1:-1});redraw();},{passive:false});
+  cv.addEventListener('touchmove',e=>{e.preventDefault();if(dragIdx<0)return;const t=e.touches[0];const{mx,my}=evXY(cv,t);const d=toData(cv,mx,my);pts[dragIdx].x=Math.max(.01,Math.min(.99,d.x));pts[dragIdx].y=Math.max(.01,Math.min(.99,d.y));redraw();},{passive:false});
+  cv.addEventListener('touchend',()=>dragIdx=-1);
+});
+
+document.getElementById('cSlider').addEventListener('input',function(){
+  const C=Math.pow(10,parseFloat(this.value));
+  document.getElementById('cVal').textContent=C>=100?C.toFixed(0):C.toFixed(2);
+  redraw();
+});
+
+// ── Margin Geometry Diagram ────────────────────────────
+function drawMarginDiagram(){
+  const cv=document.getElementById('cvMargin');
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,W(cv),H(cv));
+  const cw=W(cv),ch=H(cv);
+  ctx.fillStyle='#0e1118';ctx.fillRect(0,0,cw,ch);
+  ctx.strokeStyle='rgba(255,255,255,.04)';ctx.lineWidth=1;
+  for(let x=0;x<=8;x++){const px=x/8*cw;ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,ch);ctx.stroke();}
+
+  // margin band
+  ctx.fillStyle='rgba(45,212,160,.1)';ctx.fillRect(cw*.35,0,cw*.3,ch);
+
+  // lines
+  const vline=(x,color,dash)=>{ctx.save();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.setLineDash(dash||[]);ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,ch);ctx.stroke();ctx.setLineDash([]);ctx.restore();};
+  vline(cw*.35,GRN,[7,5]);vline(cw*.5,WHT,[]);vline(cw*.65,GRN,[7,5]);
+
+  // margin arrow
+  ctx.strokeStyle=GRN;ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(cw*.35,ch*.15);ctx.lineTo(cw*.65,ch*.15);ctx.stroke();
+  [[cw*.35],[cw*.65]].forEach(([x])=>{ctx.beginPath();ctx.moveTo(x,ch*.1);ctx.lineTo(x,ch*.2);ctx.stroke();});
+  ctx.fillStyle=GRN;ctx.font='12px Inter,sans-serif';ctx.textAlign='center';ctx.fillText('γ = 2/‖w‖',cw*.5,ch*.1);
+
+  // labels
+  ctx.fillStyle='rgba(255,255,255,.4)';ctx.font='11px JetBrains Mono,monospace';ctx.textAlign='center';
+  ctx.fillText('margin −1',cw*.35,ch*.97);ctx.fillText('margin +1',cw*.65,ch*.97);
+  ctx.fillStyle=WHT;ctx.fillText('boundary',cw*.5,ch*.97);
+
+  // +1 class
+  [[.78,.2],[.82,.43],[.88,.3],[.75,.58],[.9,.5]].forEach(([px,py])=>{
+    ctx.fillStyle=BLU;ctx.beginPath();ctx.arc(cw*px,ch*py,7,0,Math.PI*2);ctx.fill();
+  });
+  // -1 class
+  [[.15,.3],[.2,.5],[.12,.65],[.22,.2],[.1,.42]].forEach(([px,py])=>{
+    ctx.fillStyle=RED;ctx.fillRect(cw*px-6,ch*py-6,12,12);
+  });
+  // support vectors
+  [[.65,.35,BLU,'circle'],[.35,.57,RED,'rect'],[.65,.55,BLU,'circle']].forEach(([px,py,c,shape])=>{
+    ctx.strokeStyle=YEL;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(cw*px,ch*py,12,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle=c;
+    if(shape==='circle'){ctx.beginPath();ctx.arc(cw*px,ch*py,7,0,Math.PI*2);ctx.fill();}
+    else ctx.fillRect(cw*px-6,ch*py-6,12,12);
+  });
+
+  ctx.fillStyle='rgba(249,158,66,.7)';ctx.font='11px Inter,sans-serif';ctx.textAlign='left';
+  ctx.fillText('◎ = support vector',cw*.03,ch*.07);
+}
+
+// ── Noise Chart ────────────────────────────────────────
+const noiseN=60;
+const noiseRange=Array.from({length:noiseN},(_,i)=>i*1.5/(noiseN-1));
+const svmCurve=noiseRange.map(n=>0.98/(1+Math.exp(3.5*(n-.9))));
+const percCurve=noiseRange.map(n=>0.98/(1+Math.exp(5.5*(n-.55))));
+
+function drawNoiseChart(){
+  const cv=document.getElementById('cvNoise');
+  const ctx=cv.getContext('2d');
+  const cw=W(cv),ch=H(cv);
+  ctx.clearRect(0,0,cw,ch);
+  ctx.fillStyle='#0e1118';ctx.fillRect(0,0,cw,ch);
+  const pad={l:52,r:20,t:16,b:42};
+  const gw=cw-pad.l-pad.r,gh=ch-pad.t-pad.b;
+
+  // grid
+  ctx.strokeStyle='rgba(255,255,255,.06)';ctx.lineWidth=1;
+  [0,.25,.5,.75,1].forEach(f=>{
+    const y=pad.t+gh*(1-f);
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+gw,y);ctx.stroke();
+    ctx.fillStyle='#3a4460';ctx.font='11px JetBrains Mono,monospace';ctx.textAlign='right';
+    ctx.fillText((f*100).toFixed(0)+'%',pad.l-6,y+4);
+  });
+  [0,.5,1,1.5].forEach(x=>{
+    const px=pad.l+gw*(x/1.5);
+    ctx.beginPath();ctx.moveTo(px,pad.t);ctx.lineTo(px,pad.t+gh);ctx.stroke();
+    ctx.fillStyle='#3a4460';ctx.font='11px JetBrains Mono,monospace';ctx.textAlign='center';
+    ctx.fillText(x.toFixed(1),px,pad.t+gh+16);
+  });
+  ctx.fillStyle='#3a4460';ctx.font='11px Inter,sans-serif';ctx.textAlign='center';
+  ctx.fillText('Gaussian noise σ',pad.l+gw/2,ch-4);
+
+  // area + line helper
+  const drawCurve=(curve,color)=>{
+    ctx.save();ctx.globalAlpha=.1;ctx.fillStyle=color;
+    ctx.beginPath();ctx.moveTo(pad.l,pad.t+gh);
+    curve.forEach((v,i)=>{const x=pad.l+gw*(i/(curve.length-1));const y=pad.t+gh*(1-v);ctx.lineTo(x,y);});
+    ctx.lineTo(pad.l+gw,pad.t+gh);ctx.closePath();ctx.fill();ctx.globalAlpha=1;
+    ctx.strokeStyle=color;ctx.lineWidth=3;ctx.lineJoin='round';
+    ctx.beginPath();curve.forEach((v,i)=>{const x=pad.l+gw*(i/(curve.length-1));const y=pad.t+gh*(1-v);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+    ctx.stroke();ctx.restore();
+  };
+  drawCurve(percCurve,RED);drawCurve(svmCurve,BLU);
+
+  // current noise marker
+  const noise=parseFloat(document.getElementById('noiseSlider').value);
+  const ni=Math.min(noiseN-1,Math.round(noise/1.5*(noiseN-1)));
+  const mx=pad.l+gw*(noise/1.5);
+  ctx.save();ctx.strokeStyle='rgba(255,255,255,.2)';ctx.lineWidth=1;ctx.setLineDash([4,3]);
+  ctx.beginPath();ctx.moveTo(mx,pad.t);ctx.lineTo(mx,pad.t+gh);ctx.stroke();ctx.setLineDash([]);ctx.restore();
+  const pv=percCurve[ni],sv=svmCurve[ni];
+  [[pv,RED],[sv,BLU]].forEach(([v,c])=>{const y=pad.t+gh*(1-v);ctx.fillStyle=c;ctx.beginPath();ctx.arc(mx,y,5,0,Math.PI*2);ctx.fill();});
+  document.getElementById('noiseAccP').textContent=(pv*100).toFixed(1)+'%';
+  document.getElementById('noiseAccS').textContent=(sv*100).toFixed(1)+'%';
+}
+
+document.getElementById('noiseSlider').addEventListener('input',function(){
+  document.getElementById('noiseVal').textContent=parseFloat(this.value).toFixed(2);
+  drawNoiseChart();
+});
+
+// ── Seed & init ────────────────────────────────────────
+pts=[
+  {x:.2,y:.18,c:1},{x:.28,y:.32,c:1},{x:.16,y:.42,c:1},
+  {x:.33,y:.15,c:1},{x:.22,y:.52,c:1},{x:.38,y:.26,c:1},
+  {x:.6,y:.52,c:-1},{x:.7,y:.38,c:-1},{x:.66,y:.68,c:-1},
+  {x:.78,y:.58,c:-1},{x:.73,y:.76,c:-1},{x:.58,y:.7,c:-1},
+];
+
+function initAllCanvases(){
+  [cvP,cvS,document.getElementById('cvMargin'),document.getElementById('cvNoise')].forEach(cv=>{
+    _init.delete(cv.id); // force re-init on resize
+    setupCanvas(cv);
+  });
+}
+window.addEventListener('resize',()=>{
+  initAllCanvases();
+  redraw();drawMarginDiagram();drawNoiseChart();
+});
+setTimeout(()=>{
+  initAllCanvases();
+  redraw();drawMarginDiagram();drawNoiseChart();
+},120);
+</script>
 </body>
 </html>
